@@ -8,7 +8,7 @@ import DashboardScreen from './screens/DashboardScreen';
 import SterilizationCycleScreen from './screens/SterilizationCycleScreen';
 import InformesScreen from './screens/InformesScreen';
 import ReportesScreen from './screens/ReportesScreen';
-import LoginScreen from './screens/LoginScreen';
+import LoginScreen from './features/auth/LoginScreen';
 import HojasDeVidaScreen from './screens/HojasDeVidaScreen';
 
 // Configuración
