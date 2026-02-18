@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// VITE_API_URL es la variable que pusiste en tus archivos .env
 const clienteAxios = axios.create({
+    // Importante: En Vite se usa import.meta.env
     baseURL: import.meta.env.VITE_API_URL 
 });
 
