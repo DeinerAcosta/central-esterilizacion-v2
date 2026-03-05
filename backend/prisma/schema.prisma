@@ -1,0 +1,294 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// SEGURIDAD Y USUARIOS
+// ==========================================
+model Usuario {
+  id                    Int      @id @default(autoincrement())
+  codigo                String   @unique // Código generado por defecto
+  nombre                String   
+  apellido              String   // Requisito Excel
+  empresa               String   // Opciones: VIU, Fundación, Escaf
+  cargo                 String?  // Requisito Excel
+  usuario               String   @unique // Login único para el sistema
+  email                 String   @unique
+  password              String
+  foto                  String?  // Ruta de la imagen de perfil
+  rol                   String   @default("Administrador")
+  esPropietario         Boolean  @default(false) // Checkbox "Propietario de instrumentos"
+  permisos              Json?    // Árbol de permisos por módulos
+  esPasswordProvisional Boolean  @default(true) 
+  estado                Boolean  @default(true) // true = Habilitado, false = Deshabilitado
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relación inversa para el campo "Propietario" en Hoja de Vida
+  hojasDeVidaPropias    HojaVidaInstrumento[] @relation("PropietarioInstrumento")
+}
+
+// ==========================================
+// CONFIGURACIÓN: ESPECIALIDADES
+// ==========================================
+model Especialidad {
+  id                Int               @id @default(autoincrement())
+  codigo            String            @unique // Código consecutivo único (Ej: ESP-001)
+  nombre            String            @unique
+  estado            Boolean           @default(true)
+  subespecialidades Subespecialidad[]
+  kits              Kit[]
+  hojasDeVida       HojaVidaInstrumento[] 
+}
+
+model Subespecialidad {
+  id                Int                   @id @default(autoincrement())
+  codigo            String                @unique // Código automático único
+  nombre            String
+  estado            Boolean               @default(true)
+  especialidadId    Int
+  especialidad      Especialidad          @relation(fields: [especialidadId], references: [id])
+  tiposSub          TipoSubespecialidad[] 
+  kits              Kit[]
+  hojasDeVida       HojaVidaInstrumento[] 
+}
+
+model TipoSubespecialidad {
+  id                Int             @id @default(autoincrement())
+  codigo            String          @unique
+  nombre            String
+  estado            Boolean         @default(true)
+  subespecialidadId Int
+  subespecialidad   Subespecialidad @relation(fields: [subespecialidadId], references: [id])
+  hojasDeVida       HojaVidaInstrumento[] 
+}
+
+// ==========================================
+// CONFIGURACIÓN: INSUMOS Y PROVEEDORES (Sprint 1)
+// ==========================================
+model UnidadMedida {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  estado  Boolean  @default(true)
+  insumos InsumoQuirurgico[]
+}
+
+model Presentacion {
+  id      Int      @id @default(autoincrement())
+  nombre  String   @unique
+  estado  Boolean  @default(true)
+  insumos InsumoQuirurgico[]
+}
+
+model InsumoQuirurgico {
+  id                     Int          @id @default(autoincrement())
+  codigo                 String       @unique // Referencia / Código de barras
+  nombre                 String       @unique
+  descripcion            String       
+  unidadMedidaId         Int
+  unidadMedida           UnidadMedida @relation(fields: [unidadMedidaId], references: [id])
+  presentacionId         Int
+  presentacion           Presentacion @relation(fields: [presentacionId], references: [id])
+  
+  proveedorId            Int?         
+  proveedor              Proveedor?   @relation(fields: [proveedorId], references: [id])
+  
+  requiereEsterilizacion Boolean      @default(false)
+  tipoEsterilizacion     String?      
+  estado                 Boolean      @default(true) 
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  instrumentosEnKit      InstrumentoEnKit[]
+}
+
+model Proveedor {
+  id        Int      @id @default(autoincrement())
+  codigo    String   @unique // Código generado por defecto
+  tipo      String   // Interno / Externo / Compras / Mantenimiento
+  nombre    String
+  nit       String   @unique 
+  
+  pais      String
+  ciudad    String
+  
+  estado    Boolean  @default(true) 
+  
+  insumos   InsumoQuirurgico[] 
+  hojasDeVida HojaVidaInstrumento[] 
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ==========================================
+// CONFIGURACIÓN: SEDES Y QUIRÓFANOS (Sprint 1)
+// ==========================================
+model Sede {
+  id         Int         @id @default(autoincrement())
+  nombre     String      @unique
+  
+  pais       String      @default("Colombia")
+  ciudad     String      @default("")
+  direccion  String?     @default("")
+  responsable String?    @default("")
+  
+  estado     Boolean     @default(true)
+  quirofanos Quirofano[]
+  
+  kits              Kit[]
+  instrumentos      HojaVidaInstrumento[]
+
+  // Relaciones para el historial de traslados
+  trasladosOrigen   HistorialTraslado[] @relation("SedeOrigenTraslado")
+  trasladosDestino  HistorialTraslado[] @relation("SedeDestinoTraslado")
+}
+
+model Quirofano {
+  id      Int     @id @default(autoincrement())
+  codigo  String  @unique // Código generado por defecto
+  nombre  String
+  sedeId  Int
+  sede    Sede    @relation(fields: [sedeId], references: [id])
+  estado  Boolean @default(true)
+}
+
+// ==========================================
+// MÓDULO: TM KIT (Sprint 1)
+// ==========================================
+model Kit {
+  id                  Int             @id @default(autoincrement())
+  codigoKit           String          @unique
+  nombre              String
+  numeroKit           Int
+  estado              String          @default("Habilitado") 
+  especialidadId      Int
+  especialidad        Especialidad    @relation(fields: [especialidadId], references: [id])
+  subespecialidadId   Int
+  subespecialidad     Subespecialidad @relation(fields: [subespecialidadId], references: [id])
+  tipoSubespecialidad String          
+  
+  sedeId              Int?
+  sede                Sede?           @relation(fields: [sedeId], references: [id])
+
+  createdAt           DateTime        @default(now())
+
+  instrumentos        InstrumentoEnKit[]
+  hojasDeVida         HojaVidaInstrumento[] 
+  historialTraslados  HistorialTraslado[]   
+}
+
+model InstrumentoEnKit {
+  id            Int              @id @default(autoincrement())
+  kitId         Int
+  kit           Kit              @relation(fields: [kitId], references: [id])
+  instrumentoId Int
+  instrumento   InsumoQuirurgico @relation(fields: [instrumentoId], references: [id])
+}
+
+// ==========================================
+// MÓDULO: HOJA DE VIDA DE INSTRUMENTOS 
+// ==========================================
+model HojaVidaInstrumento {
+  id                      Int                 @id @default(autoincrement())
+  codigo                  String              @unique 
+  
+  // 1. Relaciones Básicas
+  especialidadId          Int
+  especialidad            Especialidad        @relation(fields: [especialidadId], references: [id])
+  subespecialidadId       Int
+  subespecialidad         Subespecialidad     @relation(fields: [subespecialidadId], references: [id])
+  tipoId                  Int
+  tipo                    TipoSubespecialidad @relation(fields: [tipoId], references: [id])
+  proveedorId             Int
+  proveedor               Proveedor           @relation(fields: [proveedorId], references: [id]) 
+  
+  kitId                   Int?                
+  kit                     Kit?                @relation(fields: [kitId], references: [id])
+  
+  sedeId                  Int?
+  sede                    Sede?               @relation(fields: [sedeId], references: [id])
+
+  // 2. Datos de Fabricación
+  nombre                  String              
+  fabricante              String
+  paisOrigen              String
+  numeroSerie             String              @unique
+  registroInvima          String              @unique
+  
+  // 3. Características Técnicas
+  material                String              
+  materialOtro            String?             
+  esterilizacion          String              
+  
+  // 4. Mantenimiento y Calibración
+  frecuenciaMantenimiento String              
+  proximoMantenimiento    DateTime?           
+  fechaMantenimientoRef   DateTime?           // <-- AÑADIDO: Requerido por tu controlador actual
+  
+  // FIX: Ampliado a 500 caracteres usando @db.VarChar(500) o Text para no tener errores de truncamiento
+  observacionesTecnico    String?             @db.Text 
+  
+  // 5. Uso y Trazabilidad
+  estadoActual            String              @default("P. registrar") 
+  cicloEsterilizacion     Int                 @default(0)              
+  propietarioId           Int                 
+  propietario             Usuario             @relation("PropietarioInstrumento", fields: [propietarioId], references: [id])
+  
+  // FIX: Ampliado a 500 caracteres
+  notasObservaciones      String?             @db.Text 
+  
+  // 6. Registro Contable (Privado según rol)
+  fechaCompra             DateTime?
+  costo                   Float?
+  iva                     Float?
+  numeroFactura           String?
+  vidaUtil                Float?              
+  
+  // 7. Archivos Adjuntos 
+  fotoUrl                 String?             
+  garantiaUrl             String?             
+  registroInvimaUrl       String?             
+  codigoInstrumentoUrl    String?             
+  facturaUrl              String?             
+  
+  // 8. Estado General 
+  estado                  String              @default("P. registrar") 
+  
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
+
+  historialTraslados      HistorialTraslado[] 
+}
+
+// ==========================================
+// NUEVO: AUDITORÍA DE TRASLADOS DE INVENTARIO
+// ==========================================
+model HistorialTraslado {
+  id                  Int       @id @default(autoincrement())
+  
+  // Referencias a qué se movió (Opcionales porque puede ser un kit o un instrumento suelto)
+  instrumentoId       Int?
+  instrumento         HojaVidaInstrumento? @relation(fields: [instrumentoId], references: [id])
+  
+  kitId               Int?
+  kit                 Kit?      @relation(fields: [kitId], references: [id])
+
+  // De dónde a dónde
+  sedeOrigenId        Int
+  sedeOrigen          Sede      @relation("SedeOrigenTraslado", fields: [sedeOrigenId], references: [id])
+  
+  sedeDestinoId       Int
+  sedeDestino         Sede      @relation("SedeDestinoTraslado", fields: [sedeDestinoId], references: [id])
+
+  fechaTraslado       DateTime  @default(now())
+  fechaDevolucion     DateTime
+
+  // Quién hizo el traslado (Ideal relacionarlo al usuario logueado en un futuro)
+  realizadoPor        String?   @default("Sistema")
+}
