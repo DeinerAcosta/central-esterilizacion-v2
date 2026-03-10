@@ -1,4 +1,13 @@
 {
+  "name": "central-esterilizacion-backend",
+  "version": "1.0.0",
+  "main": "dist/index.js",
+  "scripts": {
+    "start": "node dist/index.js",
+    "build": "tsc",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts",
+    "postinstall": "npx prisma generate"
+  },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
     "@types/cors": "^2.8.19",
@@ -8,6 +17,7 @@
     "@types/node": "^25.3.0",
     "@types/nodemailer": "^7.0.11",
     "prisma": "^5.22.0",
+    "ts-node-dev": "^2.0.0",
     "typescript": "^5.9.3"
   },
   "dependencies": {
