@@ -317,7 +317,7 @@ const KitScreen: React.FC = () => {
                       <th style={thS}>Tipo de subespecialidad</th>
                       <th style={thS}>Numero</th>
                       <th style={thS}>Cantidad</th>
-                      <th style={{ ...thS, color:'#3b82f6' }}>Código de Kit</th>
+                      <th style={thS}>Código de Kit</th>
                       <th style={{ ...thS, textAlign:'right' }}>Estado</th>
                       <th style={{ ...thS, width:52 }}></th>
                     </tr>
