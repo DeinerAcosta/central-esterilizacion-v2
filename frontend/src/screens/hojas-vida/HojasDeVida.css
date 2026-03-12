@@ -1,0 +1,52 @@
+/* src/screens/hojas-vida/HojasDeVida.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+.hv-container * {
+  font-family: 'Inter', sans-serif;
+  box-sizing: border-box;
+}
+
+.hv-save-btn {
+  padding: 11px 48px;
+  border-radius: 30px;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(90deg, #3b82f6 0%, #34d399 100%);
+  color: #fff;
+  font-weight: 700;
+  font-size: 14px;
+  box-shadow: 0 4px 14px rgba(59,130,246,0.35);
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.hv-save-btn:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.hv-cancel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  color: #64748b;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.hv-cancel-btn:hover {
+  color: #ef4444;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.table-container {
+  overflow: visible !important;
+}
