@@ -148,11 +148,12 @@ export const registrarContable = async (req: Request, res: Response) => {
       return res.status(400).json({ msg: "El instrumento ya cuenta con un registro contable activo." });
     }
 
-    const { fechaCompra, costo, iva, numeroFactura, vidaUtil } = req.body;
+    // ✅ FIX: Se asegura de leer "costoAdquisicion" que es la variable que envía el frontend
+    const { fechaCompra, costoAdquisicion, iva, numeroFactura, vidaUtil } = req.body;
     const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
     const facturaUrl = files?.['facturaDoc'] ? `/uploads/${files['facturaDoc'][0].filename}` : null;
 
-    if (!fechaCompra || !costo || !numeroFactura || !facturaUrl) {
+    if (!fechaCompra || !costoAdquisicion || !numeroFactura || !facturaUrl) {
       return res.status(400).json({ msg: "Faltan campos obligatorios para el registro contable" });
     }
 
@@ -160,7 +161,7 @@ export const registrarContable = async (req: Request, res: Response) => {
       where: { id: Number(id) },
       data: {
         fechaCompra: new Date(fechaCompra),
-        costo: parseFloat(costo),
+        costo: parseFloat(costoAdquisicion), // Se guarda en el campo 'costo' de la BD
         iva: iva ? parseFloat(iva) : null,
         numeroFactura: String(numeroFactura),
         vidaUtil: vidaUtil ? parseFloat(vidaUtil) : null,
@@ -177,7 +178,7 @@ export const registrarContable = async (req: Request, res: Response) => {
 };
 
 // ==========================================
-// 3.1 CAMBIAR ESTADO RÁPIDO (Habilitar/Deshabilitar) -> ¡NUEVO!
+// 3.1 CAMBIAR ESTADO RÁPIDO (Habilitar/Deshabilitar)
 // ==========================================
 export const patchEstadoHojaVida = async (req: Request, res: Response) => {
   try {
@@ -212,7 +213,10 @@ export const getInventario = async (req: Request, res: Response) => {
   try {
     const { especialidadId, subespecialidadId, tipoId, search } = req.query;
 
-    const whereClause: any = { estado: "Habilitado" }; 
+    // ✅ FIX: Trae Habilitados y Deshabilitados según Criterio de Aceptación
+    const whereClause: any = { 
+      estado: { in: ["Habilitado", "Deshabilitado"] } 
+    }; 
     
     if (especialidadId) whereClause.especialidadId = Number(especialidadId);
     if (subespecialidadId) whereClause.subespecialidadId = Number(subespecialidadId);
@@ -232,6 +236,10 @@ export const getInventario = async (req: Request, res: Response) => {
         subespecialidad: true,
         tipo: true,
         kit: true
+      },
+      // ✅ FIX: Ordena los habilitados de primero
+      orderBy: {
+        estado: 'asc'
       }
     });
 
@@ -317,5 +325,69 @@ export const getControlBajas = async (req: Request, res: Response) => {
   } catch (error) {
     console.error("❌ Error al obtener control de bajas:", error);
     res.status(500).json({ msg: "Error al obtener control de bajas" });
+  }
+};
+
+// ==========================================
+// 6. EDITAR HOJA DE VIDA
+// ==========================================
+export const updateHojaVida = async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+    const files = req.files as { [fieldname: string]: Express.Multer.File[] } | undefined;
+
+    // 1. Validar que la hoja de vida exista
+    const instExistente = await prisma.hojaVidaInstrumento.findUnique({ where: { id: Number(id) } });
+    if (!instExistente) return res.status(404).json({ msg: "Instrumento no encontrado" });
+
+    // 2. Preparamos los datos de texto a actualizar
+    const updateData: any = {
+      nombre: data.nombre || instExistente.nombre,
+      especialidadId: data.especialidadId ? Number(data.especialidadId) : instExistente.especialidadId,
+      subespecialidadId: data.subespecialidadId ? Number(data.subespecialidadId) : instExistente.subespecialidadId,
+      tipoId: data.tipoId ? Number(data.tipoId) : instExistente.tipoId,
+      
+      fabricante: data.fabricante || instExistente.fabricante,
+      numeroSerie: data.numeroSerie || instExistente.numeroSerie,
+      registroInvima: data.registroInvima || instExistente.registroInvima,
+      proveedorId: data.proveedorId ? Number(data.proveedorId) : instExistente.proveedorId,
+      paisOrigen: data.paisOrigen || instExistente.paisOrigen,
+      
+      material: data.material || instExistente.material,
+      materialOtro: data.material === 'Otros' ? data.materialOtro : null,
+      esterilizacion: data.esterilizacion || instExistente.esterilizacion,
+      
+      frecuenciaMantenimiento: data.frecuenciaMantenimiento || instExistente.frecuenciaMantenimiento,
+      observacionesTecnico: data.observacionesTecnico || null,
+      
+      propietarioId: data.propietarioId ? Number(data.propietarioId) : instExistente.propietarioId,
+      notasObservaciones: data.notasObservaciones || null,
+    };
+
+    // 3. Si vienen archivos nuevos en la petición, los actualizamos
+    if (files?.['foto']?.[0]) updateData.fotoUrl = `/uploads/${files['foto'][0].filename}`;
+    if (files?.['garantia']?.[0]) updateData.garantiaUrl = `/uploads/${files['garantia'][0].filename}`;
+    if (files?.['registroInvimaDoc']?.[0]) updateData.registroInvimaUrl = `/uploads/${files['registroInvimaDoc'][0].filename}`;
+    if (files?.['codigoInstrumentoDoc']?.[0]) updateData.codigoInstrumentoUrl = `/uploads/${files['codigoInstrumentoDoc'][0].filename}`;
+
+    // 4. Ejecutar la actualización en la base de datos con Prisma
+    const hojaActualizada = await prisma.hojaVidaInstrumento.update({
+      where: { id: Number(id) },
+      data: updateData
+    });
+
+    res.status(200).json({ 
+      msg: 'Hoja de vida actualizada exitosamente', 
+      data: hojaActualizada 
+    });
+
+  } catch (error: any) {
+    console.error("❌ Error al actualizar hoja de vida:", error);
+    // Verificamos si es error de duplicado de código/serie/invima
+    if (error.code === 'P2002') {
+      return res.status(400).json({ msg: 'El Número de Serie o Registro INVIMA ingresado ya está en uso.' });
+    }
+    res.status(500).json({ msg: "Error interno al actualizar la hoja de vida" });
   }
 };
