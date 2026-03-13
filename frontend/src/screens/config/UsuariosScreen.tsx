@@ -2,9 +2,10 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Search, PlusCircle, ChevronDown, ChevronUp, X,
   Eye, Edit, Copy, CheckCircle, Ban, MoreVertical,
-  Upload, User, Trash2, EyeOff, ChevronLeft, ChevronRight,
+  User, EyeOff, ChevronLeft, ChevronRight,
   ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const CARGO_ROL_MAP: Record<string, string> = {
   'Administrador General': 'Administrador',
@@ -132,35 +133,28 @@ const PERMISOS_ESTRUCTURA: any[] = [
 ];
 
 const UsuariosScreen: React.FC = () => {
-  const [isModalOpen, setIsModalOpen]             = useState(false);
-  const [modalMode, setModalMode]                 = useState<'create'|'view'|'edit'|'duplicate'>('create');
-  const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
-  const [isSuccessOpen, setIsSuccessOpen]         = useState(false);
-  const [isErrorOpen, setIsErrorOpen]             = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [errorMsg, setErrorMsg]                   = useState('');
-  const [successMsg, setSuccessMsg]               = useState('');
-  const [showPassword, setShowPassword]           = useState(false);
-  const [selectedModules, setSelectedModules]     = useState<Record<string, boolean>>({});
-  const [expandedModules, setExpandedModules]     = useState<Set<string>>(new Set());
-  const [selectedItem, setSelectedItem]           = useState<any>(null);
-  const [openMenuIndex, setOpenMenuIndex]         = useState<number|null>(null);
-  const menuRef                                   = useRef<HTMLDivElement>(null);
-  const fileInputRef                              = useRef<HTMLInputElement>(null);
-  const [usersData, setUsersData]                 = useState<any[]>([]);
-  const [loading, setLoading]                     = useState(false);
-  const [searchTerm, setSearchTerm]               = useState('');
-  const [statusFilter, setStatusFilter]           = useState('');
-  const [currentPage, setCurrentPage]             = useState(1);
-  const [totalPages, setTotalPages]               = useState(1);
-  const [totalRecords, setTotalRecords]           = useState(0);
+  const [isModalOpen, setIsModalOpen]         = useState(false);
+  const [modalMode, setModalMode]             = useState<'create'|'view'|'edit'|'duplicate'>('create');
+  const [showPassword, setShowPassword]       = useState(false);
+  const [selectedModules, setSelectedModules] = useState<Record<string, boolean>>({});
+  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
+  const [openMenuIndex, setOpenMenuIndex]     = useState<number|null>(null);
+  const menuRef                               = useRef<HTMLDivElement>(null);
+  const fileInputRef                          = useRef<HTMLInputElement>(null);
+  const [usersData, setUsersData]             = useState<any[]>([]);
+  const [loading, setLoading]                 = useState(false);
+  const [searchTerm, setSearchTerm]           = useState('');
+  const [statusFilter, setStatusFilter]       = useState('');
+  const [currentPage, setCurrentPage]         = useState(1);
+  const [totalPages, setTotalPages]           = useState(1);
+  const [totalRecords, setTotalRecords]       = useState(0);
 
   const initialForm = {
     id: null, nombre: '', apellido: '', empresa: '', cargo: '',
     email: '', password: '', rol: 'Administrador',
     esPropietario: false, registroContable: false, estado: true, fotoUrl: ''
   };
-  const [formData, setFormData] = useState<any>(initialForm);
+  const [formData, setFormData]     = useState<any>(initialForm);
   const [selectedFile, setSelectedFile] = useState<File|null>(null);
 
   useEffect(() => { fetchUsuarios(); }, [searchTerm, statusFilter, currentPage]);
@@ -218,10 +212,12 @@ const UsuariosScreen: React.FC = () => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (!['image/jpeg','image/png'].includes(file.type)) {
-      setErrorMsg('Solo se permiten formatos JPG o PNG.'); setIsErrorOpen(true); return;
+      Swal.fire({ icon: 'warning', title: 'Formato inválido', text: 'Solo se permiten formatos JPG o PNG.', confirmButtonColor: '#3b82f6' });
+      return;
     }
     if (file.size > 4 * 1024 * 1024) {
-      setErrorMsg('La imagen supera el tamaño máximo permitido (4MB).'); setIsErrorOpen(true); return;
+      Swal.fire({ icon: 'warning', title: 'Imagen muy grande', text: 'La imagen supera el tamaño máximo permitido (4MB).', confirmButtonColor: '#3b82f6' });
+      return;
     }
     setSelectedFile(file);
     setFormData((p: any) => ({ ...p, fotoUrl: URL.createObjectURL(file) }));
@@ -233,23 +229,44 @@ const UsuariosScreen: React.FC = () => {
     if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
+  /* ── Cierre con confirmación (flecha atrás y botón Cancelar en create/edit/duplicate) ── */
+  const handleCancelClick = () => {
+    if (modalMode === 'view') { setIsModalOpen(false); return; }
+    Swal.fire({
+      title: '¿Está seguro?',
+      text: modalMode === 'create' || modalMode === 'duplicate'
+        ? 'La información diligenciada no se guardará en el sistema.'
+        : 'Los cambios realizados no se guardarán en el sistema.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Aceptar',
+      cancelButtonText: 'Cancelar',
+    }).then(result => { if (result.isConfirmed) setIsModalOpen(false); });
+  };
+
   const handleSave = async () => {
     const regexAlfa  = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/;
     const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const regexPass  = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
     if (!formData.nombre.trim() || !formData.apellido.trim() || !formData.empresa ||
         !formData.cargo || !formData.email.trim() || !formData.rol) {
-      setErrorMsg('Es necesario el diligenciamiento de todos los campos obligatorios (*).'); setIsErrorOpen(true); return;
+      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Es necesario el diligenciamiento de todos los campos obligatorios (*).', confirmButtonColor: '#3b82f6' });
+      return;
     }
     if (!regexAlfa.test(formData.nombre.trim()) || !regexAlfa.test(formData.apellido.trim())) {
-      setErrorMsg('Los campos Nombre y Apellido solo deben contener caracteres alfabéticos.'); setIsErrorOpen(true); return;
+      Swal.fire({ icon: 'warning', title: 'Formato inválido', text: 'Los campos Nombre y Apellido solo deben contener caracteres alfabéticos.', confirmButtonColor: '#3b82f6' });
+      return;
     }
     if (!regexEmail.test(formData.email.trim())) {
-      setErrorMsg('El formato del correo electrónico es inválido.'); setIsErrorOpen(true); return;
+      Swal.fire({ icon: 'warning', title: 'Correo inválido', text: 'El formato del correo electrónico es inválido.', confirmButtonColor: '#3b82f6' });
+      return;
     }
     if (modalMode === 'create' || modalMode === 'duplicate' || (modalMode === 'edit' && formData.password)) {
       if (!regexPass.test(formData.password)) {
-        setErrorMsg('La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.'); setIsErrorOpen(true); return;
+        Swal.fire({ icon: 'warning', title: 'Contraseña inválida', text: 'La contraseña debe tener mínimo 8 caracteres, una mayúscula, una minúscula y un número.', confirmButtonColor: '#3b82f6' });
+        return;
       }
     }
     try {
@@ -258,27 +275,55 @@ const UsuariosScreen: React.FC = () => {
       const { id, ...rest } = formData;
       const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...rest, permisos: selectedModules }) });
       if (!res.ok) { const err = await res.json(); throw new Error(err.msg || 'Error en el servidor'); }
-      setSuccessMsg(modalMode === 'edit' ? 'Usuario actualizado correctamente' : 'Usuario creado correctamente');
-      setIsSuccessOpen(true); setIsModalOpen(false); fetchUsuarios();
-    } catch (e: any) { setErrorMsg(e.message); setIsErrorOpen(true); }
-  };
-
-  const confirmToggleStatus = async () => {
-    if (!selectedItem) return;
-    const nuevoEstado = !selectedItem.estado;
-    try {
-      const res = await fetch(`http://localhost:4000/api/usuarios/${selectedItem.id}/estado`, {
-        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ estado: nuevoEstado })
+      Swal.fire({
+        icon: 'success',
+        title: '¡Éxito!',
+        text: modalMode === 'edit' ? 'Usuario actualizado correctamente.' : 'Usuario creado correctamente.',
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        showConfirmButton: false,
       });
-      if (!res.ok) { const err = await res.json(); throw new Error(err.msg); }
-      setSuccessMsg(nuevoEstado ? 'Usuario habilitado correctamente' : 'Usuario deshabilitado correctamente');
-      setIsSuccessOpen(true); setIsStatusModalOpen(false); fetchUsuarios();
-    } catch (e: any) { setErrorMsg(e.message); setIsErrorOpen(true); setIsStatusModalOpen(false); }
+      setIsModalOpen(false);
+      fetchUsuarios();
+    } catch (e: any) {
+      Swal.fire({ icon: 'error', title: 'Error', text: e.message || 'Ocurrió un error al guardar.', confirmButtonColor: '#ef4444' });
+    }
   };
 
-  const handleCancelClick = () => {
-    if (modalMode === 'view') setIsModalOpen(false);
-    else setIsCancelAlertOpen(true);
+  const handleToggleStatus = (row: any) => {
+    setOpenMenuIndex(null);
+    const accion = row.estado ? 'deshabilitará' : 'habilitará';
+    Swal.fire({
+      title: '¿Está seguro?',
+      html: `Se <b>${accion}</b> al usuario:<br/><span style="color:#475569;font-weight:600">${row.nombre} ${row.apellido}</span>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'Cancelar',
+    }).then(async result => {
+      if (result.isConfirmed) {
+        try {
+          const nuevoEstado = !row.estado;
+          const res = await fetch(`http://localhost:4000/api/usuarios/${row.id}/estado`, {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: nuevoEstado })
+          });
+          if (!res.ok) { const err = await res.json(); throw new Error(err.msg); }
+          Swal.fire({
+            icon: 'success',
+            title: 'Estado actualizado',
+            text: `El usuario ha sido ${nuevoEstado ? 'habilitado' : 'deshabilitado'}.`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          fetchUsuarios();
+        } catch (e: any) {
+          Swal.fire({ icon: 'error', title: 'Error', text: e.message || 'No se pudo cambiar el estado.', confirmButtonColor: '#ef4444' });
+        }
+      }
+    });
   };
 
   const toggleExpand = (id: string) => {
@@ -349,14 +394,12 @@ const UsuariosScreen: React.FC = () => {
     });
   };
 
-  /* ── Permission CHIP (badge style for Módulos) ── */
   const renderPermChip = (moduleId: string, perm: any) => {
     const key         = `${moduleId}__${perm.key}`;
     const isModChk    = !!selectedModules[moduleId];
     const isPermChk   = !!selectedModules[key];
     const isReadOnly  = modalMode === 'view';
     const canInteract = isModChk && !isReadOnly;
-
     return (
       <label key={perm.key}
         onClick={e => { e.stopPropagation(); if (canInteract) togglePerm(moduleId, perm.key); }}
@@ -374,7 +417,6 @@ const UsuariosScreen: React.FC = () => {
     );
   };
 
-  /* ── Leaf row (módulo + sus chips de permisos) ── */
   const renderLeafRow = (module: any) => {
     if (module.type === 'group_label') {
       return (
@@ -401,10 +443,9 @@ const UsuariosScreen: React.FC = () => {
     );
   };
 
-  /* ── Sub-accordion (Ciclo / Informes) ── */
   const renderSubAccordion = (child: any) => {
-    const isSubExp = expandedModules.has(child.id);
-    const isSubChk = !!selectedModules[child.id];
+    const isSubExp   = expandedModules.has(child.id);
+    const isSubChk   = !!selectedModules[child.id];
     const isReadOnly = modalMode === 'view';
     return (
       <div key={child.id} className="border-b border-slate-100 last:border-0">
@@ -432,13 +473,11 @@ const UsuariosScreen: React.FC = () => {
     );
   };
 
-  /* ── Section checkable (Hoja de vida) ── */
   const renderSectionCheckable = (section: any) => {
     const isChecked  = !!selectedModules[section.id];
     const isReadOnly = modalMode === 'view';
     return (
       <div key={section.id} className="border-b border-slate-100 last:border-0">
-        {/* Header row - selects all children */}
         <div
           className={`flex items-center gap-3 px-5 py-3.5 transition-colors ${
             isChecked ? 'bg-blue-50' : 'bg-white hover:bg-slate-50/40'
@@ -448,11 +487,8 @@ const UsuariosScreen: React.FC = () => {
             className="w-4 h-4 rounded border-slate-300 text-blue-500 flex-shrink-0 pointer-events-none"
             style={isChecked ? { accentColor: '#0ea5e9' } : undefined}
           />
-          <span className={`flex-1 text-sm font-semibold select-none ${isChecked ? 'text-blue-500' : 'text-blue-500'}`}>
-            {section.label}
-          </span>
+          <span className="flex-1 text-sm font-semibold select-none text-blue-500">{section.label}</span>
         </div>
-        {/* Children always visible */}
         <div className="divide-y divide-slate-100">
           {section.children.map((leaf: any) => renderLeafRow(leaf))}
         </div>
@@ -460,15 +496,12 @@ const UsuariosScreen: React.FC = () => {
     );
   };
 
-  /* ── Configuración TABLE layout ── */
   const renderConfigTable = (topItem: any) => {
     const isReadOnly = modalMode === 'view';
     const cols: { key: string; label: string }[] = topItem.tableColumns;
-
     const allChecked = topItem.children.every((item: any) =>
       selectedModules[item.id] && cols.every(c => selectedModules[`${item.id}__${c.key}`])
     );
-
     const toggleAllConfig = () => {
       if (isReadOnly) return;
       const newVal = !allChecked;
@@ -479,7 +512,6 @@ const UsuariosScreen: React.FC = () => {
       });
       setSelectedModules(prev => ({ ...prev, ...updates }));
     };
-
     return (
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -514,8 +546,8 @@ const UsuariosScreen: React.FC = () => {
                     </div>
                   </td>
                   {cols.map(col => {
-                    const permKey  = `${item.id}__${col.key}`;
-                    const isPermChk = !!selectedModules[permKey];
+                    const permKey    = `${item.id}__${col.key}`;
+                    const isPermChk  = !!selectedModules[permKey];
                     const canInteract = isItemChk && !isReadOnly;
                     return (
                       <td key={col.key} className="px-4 py-3 text-center">
@@ -536,21 +568,17 @@ const UsuariosScreen: React.FC = () => {
     );
   };
 
-  /* ── Main permissions renderer ── */
   const renderPermisos = () => (
     <div className="rounded-2xl border border-slate-200 overflow-hidden divide-y divide-slate-200">
       {PERMISOS_ESTRUCTURA.map(topItem => {
         const isTopExpanded = expandedModules.has(topItem.id);
         const isTopChecked  = !!selectedModules[topItem.id];
         const isReadOnly    = modalMode === 'view';
-
         return (
           <div key={topItem.id}>
-            {/* Top-level header */}
-            <div
-              className={`flex items-center gap-3 px-5 py-4 select-none transition-colors ${
-                isTopChecked ? 'bg-blue-500' : 'bg-slate-50 hover:bg-slate-100'
-              }`}>
+            <div className={`flex items-center gap-3 px-5 py-4 select-none transition-colors ${
+              isTopChecked ? 'bg-blue-500' : 'bg-slate-50 hover:bg-slate-100'
+            }`}>
               <input type="checkbox" checked={isTopChecked}
                 onChange={e => { e.stopPropagation(); toggleTopLevel(topItem); }}
                 disabled={isReadOnly}
@@ -567,10 +595,8 @@ const UsuariosScreen: React.FC = () => {
                 {isTopExpanded ? <ChevronUp size={18}/> : <ChevronDown size={18}/>}
               </button>
             </div>
-
             {isTopExpanded && (
               <div className="bg-white">
-                {/* Configuración → TABLE */}
                 {topItem.type === 'top_table' ? renderConfigTable(topItem) : (
                   <div className="divide-y divide-slate-100">
                     {topItem.children.map((child: any) => {
@@ -681,7 +707,7 @@ const UsuariosScreen: React.FC = () => {
                               <button onClick={() => handleOpenModal('edit', row)} className="flex items-center gap-2 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-blue-500 text-left"><Edit size={14}/> Editar</button>
                               <button onClick={() => handleOpenModal('duplicate', row)} className="flex items-center gap-2 px-4 py-2.5 text-xs text-slate-600 hover:bg-slate-50 hover:text-blue-500 text-left"><Copy size={14}/> Duplicar</button>
                               <div className="h-px bg-slate-100 my-1"/>
-                              <button onClick={() => { setSelectedItem(row); setIsStatusModalOpen(true); setOpenMenuIndex(null); }}
+                              <button onClick={() => handleToggleStatus(row)}
                                 className={`flex items-center gap-2 px-4 py-2.5 text-xs hover:bg-slate-50 text-left ${row.estado ? 'text-red-500' : 'text-emerald-500'}`}>
                                 {row.estado ? <Ban size={14}/> : <CheckCircle size={14}/>}
                                 {row.estado ? 'Deshabilitar' : 'Habilitar'}
@@ -715,6 +741,7 @@ const UsuariosScreen: React.FC = () => {
 
           {/* Encabezado */}
           <div className="flex items-center gap-3">
+            {/* Flecha atrás — confirma si hay cambios sin guardar */}
             <button onClick={handleCancelClick} className="text-blue-500 hover:text-blue-700 transition-colors">
               <ChevronLeft size={28} strokeWidth={2.5}/>
             </button>
@@ -792,9 +819,8 @@ const UsuariosScreen: React.FC = () => {
             </div>
           </div>
 
-          {/* Bloque 3: Checkboxes especiales + Roles y permisos (como en imagen) */}
+          {/* Bloque 3: Checkboxes especiales + Roles y permisos */}
           <div className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm p-6">
-            {/* Propietario / Registro Contable — ENCIMA de roles */}
             <div className="flex flex-wrap items-center gap-6 mb-6 pb-5 border-b border-slate-100">
               <label className={`flex items-center gap-2 text-sm font-medium select-none transition-opacity ${
                 formData.registroContable ? 'text-slate-400 opacity-50' : 'text-slate-600 cursor-pointer'
@@ -813,8 +839,6 @@ const UsuariosScreen: React.FC = () => {
                 Registro Contable
               </label>
             </div>
-
-            {/* Roles y permisos */}
             <h3 className="text-base font-bold text-slate-800 mb-4">Roles y permisos</h3>
             {renderPermisos()}
           </div>
@@ -829,66 +853,6 @@ const UsuariosScreen: React.FC = () => {
             ) : (
               <button className="px-12 py-3 rounded-full bg-slate-200 text-slate-600 font-bold hover:bg-slate-300 transition-colors" onClick={()=>setIsModalOpen(false)}>Cerrar</button>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ════ ALERTAS ════ */}
-      {isCancelAlertOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"/>
-          <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-            <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-3xl">!</div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">¿Está seguro?</h3>
-            <p className="text-slate-500 text-sm mb-8">La información diligenciada no se guardará en el sistema.</p>
-            <div className="flex gap-3">
-              <button onClick={()=>setIsCancelAlertOpen(false)} className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold text-sm">Cancelar</button>
-              <button onClick={()=>{setIsCancelAlertOpen(false); setIsModalOpen(false);}} className="flex-1 py-2.5 rounded-full bg-blue-500 text-white font-bold text-sm">Aceptar</button>
-            </div>
-          </div>
-        </div>
-      )}
-      {isSuccessOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={()=>setIsSuccessOpen(false)}/>
-          <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-            <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle size={32}/></div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Éxito</h3>
-            <p className="text-slate-500 text-sm mb-8">{successMsg}</p>
-            <button onClick={()=>setIsSuccessOpen(false)} className="w-full py-2.5 rounded-full bg-emerald-500 text-white font-bold text-sm">Aceptar</button>
-          </div>
-        </div>
-      )}
-      {isErrorOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center font-sans">
-          <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={()=>setIsErrorOpen(false)}/>
-          <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 text-center shadow-2xl">
-            <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><X size={32}/></div>
-            <h3 className="text-xl font-bold text-slate-800 mb-2">Error / Aviso</h3>
-            <p className="text-slate-500 text-sm mb-8">{errorMsg}</p>
-            <button onClick={()=>setIsErrorOpen(false)} className="w-full py-2.5 rounded-full bg-red-500 text-white font-bold text-sm">Aceptar</button>
-          </div>
-        </div>
-      )}
-      {isStatusModalOpen && selectedItem && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 font-sans">
-          <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={()=>setIsStatusModalOpen(false)}/>
-          <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 shadow-2xl flex flex-col items-center text-center">
-            <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 ${selectedItem.estado ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'}`}>
-              {selectedItem.estado ? <Ban size={40} strokeWidth={1.5}/> : <CheckCircle size={40} strokeWidth={1.5}/>}
-            </div>
-            <h2 className="text-2xl font-extrabold text-slate-800 mb-2">{selectedItem.estado ? 'Deshabilitar' : 'Habilitar'}</h2>
-            <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4 font-medium">
-              ¿Estás seguro de que deseas {selectedItem.estado ? 'deshabilitar' : 'habilitar'} al usuario{' '}
-              <span className="font-bold text-slate-700">{selectedItem.nombre} {selectedItem.apellido}</span>?
-            </p>
-            <div className="flex gap-3 w-full">
-              <button onClick={()=>setIsStatusModalOpen(false)} className="flex-1 py-3 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 text-sm">Cancelar</button>
-              <button onClick={confirmToggleStatus}
-                className={`flex-1 py-3 rounded-full text-white font-bold shadow-lg text-sm bg-gradient-to-r ${selectedItem.estado ? 'from-red-500 to-rose-400' : 'from-blue-500 to-emerald-400'}`}>
-                Confirmar
-              </button>
-            </div>
           </div>
         </div>
       )}
@@ -935,4 +899,4 @@ const UNotchSelect: React.FC<UNotchSelectProps> = ({ id, label, value, disabled=
   );
 };
 
-export default UsuariosScreen;                 
+export default UsuariosScreen;

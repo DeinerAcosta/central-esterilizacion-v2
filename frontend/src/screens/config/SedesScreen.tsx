@@ -3,50 +3,40 @@ import {
   Search, PlusCircle, ChevronDown, MoreVertical, Edit, Ban, CheckCircle, X, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const SedesScreen: React.FC = () => {
-  const [isModalOpen, setIsModalOpen]             = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
-  const [isErrorOpen, setIsErrorOpen]             = useState(false);
-  const [isSuccessOpen, setIsSuccessOpen]         = useState(false);
-  const [errorMsg, setErrorMsg]                   = useState('');
-  const [successMsg, setSuccessMsg]               = useState('');
-  const [openMenuIndex, setOpenMenuIndex]         = useState<number | null>(null);
-  const menuRef                                   = useRef<HTMLDivElement>(null);
-  const [modalMode, setModalMode]                 = useState<'create' | 'edit' | 'view'>('create');
-  const [selectedItem, setSelectedItem]           = useState<any>(null);
-  const [loading, setLoading]                     = useState(false);
-  const [data, setData]                           = useState<any[]>([]);
-  const [currentPage, setCurrentPage]             = useState(1);
-  const [totalPages, setTotalPages]               = useState(1);
-  const [totalRecords, setTotalRecords]           = useState(0);
-  const [searchTerm, setSearchTerm]               = useState('');
-  const [statusFilter, setStatusFilter]           = useState('');
-
-  // API Estados
-  const [apiData, setApiData]                     = useState<any[]>([]); 
-  const [ciudadesOptions, setCiudadesOptions]     = useState<string[]>([]);
+  const [isModalOpen, setIsModalOpen]         = useState(false);
+  const [openMenuIndex, setOpenMenuIndex]     = useState<number | null>(null);
+  const menuRef                               = useRef<HTMLDivElement>(null);
+  const [modalMode, setModalMode]             = useState<'create' | 'edit' | 'view'>('create');
+  const [loading, setLoading]                 = useState(false);
+  const [data, setData]                       = useState<any[]>([]);
+  const [currentPage, setCurrentPage]         = useState(1);
+  const [totalPages, setTotalPages]           = useState(1);
+  const [totalRecords, setTotalRecords]       = useState(0);
+  const [searchTerm, setSearchTerm]           = useState('');
+  const [statusFilter, setStatusFilter]       = useState('');
+  const [apiData, setApiData]                 = useState<any[]>([]);
+  const [ciudadesOptions, setCiudadesOptions] = useState<string[]>([]);
 
   const initialFormState = { id: null, nombre: '', pais: '', ciudad: '', direccion: '', responsable: '' };
   const [formData, setFormData] = useState<any>(initialFormState);
 
-  // Cargar API de Países
   useEffect(() => {
     const fetchApiUbicaciones = async () => {
       try {
-        const res = await fetch('https://countriesnow.space/api/v0.1/countries');
+        const res  = await fetch('https://countriesnow.space/api/v0.1/countries');
         const json = await res.json();
-        if(json && json.data) {
+        if (json && json.data) {
           const sorted = json.data.sort((a: any, b: any) => a.country.localeCompare(b.country));
           setApiData(sorted);
         }
-      } catch (error) { console.error("Error cargando API de países:", error); }
+      } catch (error) { console.error('Error cargando API de países:', error); }
     };
     fetchApiUbicaciones();
   }, []);
 
-  // Filtrar ciudades por país
   useEffect(() => {
     if (formData.pais && apiData.length > 0) {
       const selected = apiData.find((p: any) => p.country === formData.pais);
@@ -84,16 +74,32 @@ const SedesScreen: React.FC = () => {
     } catch (error) { console.error(error); } finally { setLoading(false); }
   };
 
-  const handleCancelClick = () => {
-    if (modalMode === 'view') setIsModalOpen(false);
-    else setIsCancelAlertOpen(true);
+  /* ── Cierre con confirmación (X, backdrop y botón Cancelar en create/edit) ── */
+  const handleCloseModal = () => {
+    if (modalMode === 'view') { setIsModalOpen(false); return; }
+    Swal.fire({
+      title: '¿Está seguro?',
+      text: modalMode === 'create'
+        ? 'La información diligenciada no se guardará en el sistema.'
+        : 'Los cambios realizados no se guardarán en el sistema.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Aceptar',
+      cancelButtonText: 'Cancelar',
+    }).then(result => { if (result.isConfirmed) setIsModalOpen(false); });
   };
 
   const handleSave = async () => {
     const { nombre, pais, ciudad, direccion, responsable } = formData;
     if (!nombre.trim() || !pais || !ciudad || !direccion.trim() || !responsable.trim()) {
-      setErrorMsg('Es necesario el diligenciamiento de todos los campos obligatorios.');
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos incompletos',
+        text: 'Es necesario el diligenciamiento de todos los campos obligatorios.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
     try {
@@ -101,41 +107,73 @@ const SedesScreen: React.FC = () => {
       const url    = modalMode === 'create'
         ? 'http://localhost:4000/api/sedes'
         : `http://localhost:4000/api/sedes/${formData.id}`;
-      const res = await fetch(url, {
+      const res  = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ nombre, pais, ciudad, direccion, responsable })
       });
       const json = await res.json();
       if (!res.ok) throw new Error(json.msg);
-      setSuccessMsg(modalMode === 'create' ? 'Sede creada correctamente' : 'Sede actualizada correctamente');
-      setIsSuccessOpen(true);
+      Swal.fire({
+        icon: 'success',
+        title: '¡Éxito!',
+        text: modalMode === 'create' ? 'Sede creada correctamente.' : 'Sede actualizada correctamente.',
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        showConfirmButton: false,
+      });
       setIsModalOpen(false);
       fetchSedes();
     } catch (error: any) {
-      setErrorMsg(error.message);
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Ocurrió un error al guardar.',
+        confirmButtonColor: '#ef4444',
+      });
     }
   };
 
-  const confirmToggleStatus = async () => {
-    if (!selectedItem) return;
-    const nuevoEstado = selectedItem.status === 'Deshabilitado';
-    try {
-      const res = await fetch(`http://localhost:4000/api/sedes/${selectedItem.id}/estado`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-      if (!res.ok) throw new Error('Error al cambiar estado');
-      setSuccessMsg(nuevoEstado ? 'Sede habilitada correctamente' : 'Sede deshabilitada correctamente');
-      setIsSuccessOpen(true);
-      setIsStatusModalOpen(false);
-      fetchSedes();
-    } catch {
-      setErrorMsg('No se pudo cambiar el estado.');
-      setIsErrorOpen(true);
-    }
+  const handleToggleStatus = (item: any) => {
+    setOpenMenuIndex(null);
+    const accion = item.status === 'Habilitado' ? 'deshabilitará' : 'habilitará';
+    Swal.fire({
+      title: '¿Está seguro?',
+      html: `Se <b>${accion}</b> la sede:<br/><span style="color:#475569;font-weight:600">${item.nombre}</span>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'Cancelar',
+    }).then(async result => {
+      if (result.isConfirmed) {
+        try {
+          const nuevoEstado = item.status === 'Deshabilitado';
+          const res = await fetch(`http://localhost:4000/api/sedes/${item.id}/estado`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: nuevoEstado })
+          });
+          if (!res.ok) throw new Error('Error al cambiar estado');
+          Swal.fire({
+            icon: 'success',
+            title: 'Estado actualizado',
+            text: `La sede ha sido ${nuevoEstado ? 'habilitada' : 'deshabilitada'}.`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          fetchSedes();
+        } catch {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cambiar el estado de la sede.',
+            confirmButtonColor: '#ef4444',
+          });
+        }
+      }
+    });
   };
 
   return (
@@ -164,8 +202,7 @@ const SedesScreen: React.FC = () => {
           position: absolute; right: 14px; top: 50%;
           transform: translateY(-50%); pointer-events: none; color: #60a5fa;
         }
-          
-        /* SCROLLBAR PERSONALIZADO PARA LOS SELECTS */
+
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
@@ -179,7 +216,6 @@ const SedesScreen: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-3 justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100">
           <div className="flex gap-3 flex-1 w-full md:w-auto items-center">
 
-            {/* Filtro Estado */}
             <div style={{ width: 170, flexShrink: 0 }}>
               <SENotchSelect
                 id="statusFilter" label="Estado"
@@ -193,7 +229,6 @@ const SedesScreen: React.FC = () => {
               />
             </div>
 
-            {/* Búsqueda */}
             <div style={{ position: 'relative', flex: 1, maxWidth: 560 }}>
               <input
                 type="text"
@@ -229,7 +264,7 @@ const SedesScreen: React.FC = () => {
               <thead className="bg-slate-50/50 text-slate-700 font-bold border-b border-slate-200">
                 <tr>
                   <th className="px-6 py-4">Nombre de la Sede</th>
-                  <th className="px-6 py-4">Ubicación</th> {/* REQUERIMIENTO: Cambio de Ciudad por Ubicacion */}
+                  <th className="px-6 py-4">Ubicación</th>
                   <th className="px-6 py-4">Dirección</th>
                   <th className="px-6 py-4">Responsable</th>
                   <th className="px-6 py-4 text-center">Estado</th>
@@ -242,8 +277,7 @@ const SedesScreen: React.FC = () => {
                 ) : (data || []).map((row, i) => (
                   <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
                     <td className="px-6 py-4 text-slate-500 font-medium">{row.nombre}</td>
-                    {/* Concatenamos País y Ciudad si existen */}
-                    <td className="px-6 py-4 text-slate-500">{row.ciudad}{row.pais ? `, ${row.pais}` : ''}</td> 
+                    <td className="px-6 py-4 text-slate-500">{row.ciudad}{row.pais ? `, ${row.pais}` : ''}</td>
                     <td className="px-6 py-4 text-slate-500">{row.direccion}</td>
                     <td className="px-6 py-4 text-slate-500">{row.responsable}</td>
                     <td className="px-6 py-4 text-center">
@@ -277,7 +311,7 @@ const SedesScreen: React.FC = () => {
                             <FileText size={14}/> Ver detalle
                           </button>
                           <button
-                            onClick={() => { setSelectedItem(row); setIsStatusModalOpen(true); setOpenMenuIndex(null); }}
+                            onClick={() => handleToggleStatus(row)}
                             className={`flex items-center gap-2 w-full px-4 py-2.5 text-xs hover:bg-slate-50 font-bold text-left ${
                               row.status === 'Habilitado' ? 'text-red-500' : 'text-emerald-500'
                             }`}
@@ -294,14 +328,13 @@ const SedesScreen: React.FC = () => {
             </table>
           </div>
 
-          {/* Paginación */}
           <div className="p-4 flex justify-between items-center text-xs text-slate-400 border-t border-slate-50 font-medium">
             <span>Mostrando {data.length} de {totalRecords} registros</span>
             <div className="flex items-center gap-3 text-blue-500">
               <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronsLeft size={16}/></button>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronLeft size={16}/></button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronLeft size={16}/></button>
               <span className="bg-blue-50 px-3 py-1 rounded text-blue-600 font-bold">Pág. {currentPage} de {totalPages || 1}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronRight size={16}/></button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronRight size={16}/></button>
               <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronsRight size={16}/></button>
             </div>
           </div>
@@ -310,9 +343,10 @@ const SedesScreen: React.FC = () => {
         {/* ══ MODAL CREAR / EDITAR / VER ══ */}
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            {/* Backdrop — confirma antes de cerrar si es create/edit */}
             <div
               style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(4px)' }}
-              onClick={handleCancelClick}
+              onClick={handleCloseModal}
             />
             <div style={{
               position: 'relative', background: '#fff', width: '100%', maxWidth: 520,
@@ -321,8 +355,9 @@ const SedesScreen: React.FC = () => {
               display: 'flex', flexDirection: 'column', gap: 18,
               fontFamily: "'Inter', sans-serif",
             }}>
+              {/* X — confirma antes de cerrar si es create/edit */}
               <button
-                onClick={handleCancelClick}
+                onClick={handleCloseModal}
                 style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 4 }}
               >
                 <X size={20} />
@@ -334,7 +369,6 @@ const SedesScreen: React.FC = () => {
                 {modalMode === 'view'   && 'Detalle de sede'}
               </h2>
 
-              {/* 1️⃣ Nombre */}
               <SENotchInput
                 id="nombre" label="Nombre" required
                 value={formData.nombre}
@@ -342,7 +376,6 @@ const SedesScreen: React.FC = () => {
                 onChange={(v) => setFormData((p: any) => ({ ...p, nombre: v }))}
               />
 
-              {/* 2️⃣ REQUERIMIENTO CUMPLIDO: País y Ciudad en la misma fila */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <SECustomSelect
                   id="pais" label="País" required
@@ -358,7 +391,6 @@ const SedesScreen: React.FC = () => {
                 />
               </div>
 
-              {/* 3️⃣ Dirección y Responsable */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
                 <SENotchInput
                   id="direccion" label="Dirección" required
@@ -374,91 +406,13 @@ const SedesScreen: React.FC = () => {
                 />
               </div>
 
-              {/* Botones */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 44, marginTop: 8 }}>
-                <button className="se-cancel-btn" onClick={handleCancelClick}>
+                <button className="se-cancel-btn" onClick={handleCloseModal}>
                   {modalMode === 'view' ? 'Cerrar' : 'Cancelar'}
                 </button>
                 {modalMode !== 'view' && (
                   <button className="se-save-btn" onClick={handleSave}>Guardar</button>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA CANCELAR ══ */}
-        {isCancelAlertOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-              <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-3xl">!</div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">¿Está seguro?</h3>
-              <p className="text-slate-500 text-sm mb-8">La información diligenciada no se guardará en el sistema.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setIsCancelAlertOpen(false)} className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold text-sm">Cancelar</button>
-                <button onClick={() => { setIsCancelAlertOpen(false); setIsModalOpen(false); }} className="flex-1 py-2.5 rounded-full bg-blue-500 text-white font-bold text-sm">Aceptar</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA ÉXITO ══ */}
-        {isSuccessOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsSuccessOpen(false)} />
-            <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle size={32}/></div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Éxito</h3>
-              <p className="text-slate-500 text-sm mb-8">{successMsg}</p>
-              <button onClick={() => setIsSuccessOpen(false)} className="w-full py-2.5 rounded-full bg-emerald-500 text-white font-bold text-sm">Aceptar</button>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA ERROR ══ */}
-        {isErrorOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center font-sans">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsErrorOpen(false)} />
-            <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 text-center shadow-2xl">
-              <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><X size={32}/></div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Error / Aviso</h3>
-              <p className="text-slate-500 text-sm mb-8">{errorMsg}</p>
-              <button onClick={() => setIsErrorOpen(false)} className="w-full py-2.5 rounded-full bg-red-500 text-white font-bold text-sm">Aceptar</button>
-            </div>
-          </div>
-        )}
-
-        {/* ══ MODAL ESTADO ══ */}
-        {isStatusModalOpen && selectedItem && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 font-sans">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setIsStatusModalOpen(false)} />
-            <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 shadow-2xl flex flex-col items-center text-center">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm ${
-                selectedItem.status === 'Habilitado' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'
-              }`}>
-                {selectedItem.status === 'Habilitado'
-                  ? <Ban size={40} strokeWidth={1.5} />
-                  : <CheckCircle size={40} strokeWidth={1.5} />
-                }
-              </div>
-              <h2 className="text-2xl font-extrabold text-slate-800 mb-2">
-                {selectedItem.status === 'Habilitado' ? 'Deshabilitar' : 'Habilitar'}
-              </h2>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4 font-medium">
-                ¿Estás seguro de que deseas {selectedItem.status === 'Habilitado' ? 'deshabilitar' : 'habilitar'} la sede{' '}
-                <span className="font-bold text-slate-700">{selectedItem.nombre}</span>?
-              </p>
-              <div className="flex gap-3 w-full">
-                <button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-3 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 text-sm">Cancelar</button>
-                <button
-                  onClick={confirmToggleStatus}
-                  className={`flex-1 py-3 rounded-full text-white font-bold shadow-lg text-sm bg-gradient-to-r ${
-                    selectedItem.status === 'Habilitado' ? 'from-red-500 to-rose-400' : 'from-blue-500 to-emerald-400'
-                  }`}
-                >
-                  Confirmar
-                </button>
               </div>
             </div>
           </div>
@@ -469,7 +423,7 @@ const SedesScreen: React.FC = () => {
 };
 
 /* ══════════════════════════════════════════════
-   SENotchInput — label flotante (sube/baja)
+   SENotchInput
    ══════════════════════════════════════════════ */
 interface SENotchInputProps {
   id: string; label: string; value: string;
@@ -518,7 +472,7 @@ const SENotchInput: React.FC<SENotchInputProps> = ({
 };
 
 /* ══════════════════════════════════════════════
-   SENotchSelect — Select Nativo (Para Estado)
+   SENotchSelect
    ══════════════════════════════════════════════ */
 interface SENotchSelectProps {
   id: string; label: string; value: string;
@@ -581,11 +535,18 @@ const SENotchSelect: React.FC<SENotchSelectProps> = ({
 /* ══════════════════════════════════════════════
    SECustomSelect — Menú Desplegable con Scroll (Para País y Ciudad)
    ══════════════════════════════════════════════ */
-interface SECustomSelectProps { id: string; label: string; value: string; disabled?: boolean; required?: boolean; onChange: (value: string) => void; options: { value: string | number; label: string }[]; }
-const SECustomSelect: React.FC<SECustomSelectProps> = ({ id, label, value, disabled = false, required = false, onChange, options }) => {
-  const [isOpen, setIsOpen] = useState(false);
+interface SECustomSelectProps {
+  id: string; label: string; value: string;
+  disabled?: boolean; required?: boolean;
+  onChange: (value: string) => void;
+  options: { value: string | number; label: string }[];
+}
+const SECustomSelect: React.FC<SECustomSelectProps> = ({
+  id, label, value, disabled = false, required = false, onChange, options
+}) => {
+  const [isOpen, setIsOpen]   = useState(false);
   const [focused, setFocused] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const wrapperRef            = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -598,39 +559,74 @@ const SECustomSelect: React.FC<SECustomSelectProps> = ({ id, label, value, disab
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const bgColor = disabled ? '#f8fafc' : '#fff';
+  const bgColor        = disabled ? '#f8fafc' : '#fff';
   const selectedOption = options.find(o => String(o.value) === String(value));
-  const displayValue = selectedOption ? selectedOption.label : 'Seleccionar';
+  const displayValue   = selectedOption ? selectedOption.label : 'Seleccionar';
 
   return (
     <div ref={wrapperRef} style={{ position: 'relative', width: '100%' }}>
-      <div onClick={() => { if (!disabled) { setIsOpen(!isOpen); setFocused(true); } }} style={{ width: '100%', height: 48, borderRadius: 30, border: `1.5px solid ${focused || isOpen ? '#3b82f6' : '#d1d5db'}`, background: bgColor, padding: '14px 36px 0 16px', fontSize: 13.5, color: value === '' ? '#9ca3af' : (disabled ? '#94a3b8' : '#334155'), outline: 'none', boxSizing: 'border-box', transition: 'border-color 0.2s', fontFamily: 'Inter, sans-serif', cursor: disabled ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center' }}>
+      <div
+        onClick={() => { if (!disabled) { setIsOpen(!isOpen); setFocused(true); } }}
+        style={{
+          width: '100%', height: 48, borderRadius: 30,
+          border: `1.5px solid ${focused || isOpen ? '#3b82f6' : '#d1d5db'}`,
+          background: bgColor,
+          padding: '14px 36px 0 16px', fontSize: 13.5,
+          color: value === '' ? '#9ca3af' : (disabled ? '#94a3b8' : '#334155'),
+          outline: 'none', boxSizing: 'border-box',
+          transition: 'border-color 0.2s', fontFamily: 'Inter, sans-serif',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center',
+        }}
+      >
         <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', display: 'block', width: '100%', marginTop: -4 }}>
           {displayValue}
         </span>
       </div>
 
-      <label style={{ position: 'absolute', left: 18, top: 0, transform: 'translateY(-50%)', fontSize: 10.5, color: focused || isOpen ? '#3b82f6' : '#6b7280', pointerEvents: 'none', background: bgColor, padding: '0 4px', fontFamily: 'Inter, sans-serif', whiteSpace: 'nowrap', transition: 'color 0.18s', zIndex: 10 }}>
+      <label style={{
+        position: 'absolute', left: 18, top: 0,
+        transform: 'translateY(-50%)', fontSize: 10.5,
+        color: focused || isOpen ? '#3b82f6' : '#6b7280',
+        pointerEvents: 'none', background: bgColor,
+        padding: '0 4px', fontFamily: 'Inter, sans-serif',
+        whiteSpace: 'nowrap', transition: 'color 0.18s', zIndex: 10,
+      }}>
         {label}{required && <span style={{ color: '#ef4444', marginLeft: 1 }}>*</span>}
       </label>
 
-      <ChevronDown size={15} style={{ position: 'absolute', right: 14, top: '50%', transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`, pointerEvents: 'none', color: '#9ca3af', transition: 'transform 0.2s' }} />
+      <ChevronDown size={15} style={{
+        position: 'absolute', right: 14, top: '50%',
+        transform: `translateY(-50%) ${isOpen ? 'rotate(180deg)' : ''}`,
+        pointerEvents: 'none', color: '#9ca3af', transition: 'transform 0.2s',
+      }} />
 
       {isOpen && (
-        <ul className="custom-scrollbar" style={{ position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16, boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: 200, overflowY: 'auto', zIndex: 9999, padding: '8px 0', margin: 0, listStyle: 'none' }}>
+        <ul className="custom-scrollbar" style={{
+          position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+          background: '#fff', border: '1px solid #e2e8f0', borderRadius: 16,
+          boxShadow: '0 10px 25px rgba(0,0,0,0.1)', maxHeight: 200,
+          overflowY: 'auto', zIndex: 9999, padding: '8px 0', margin: 0, listStyle: 'none',
+        }}>
           {options.length === 0 ? (
             <li style={{ padding: '10px 16px', fontSize: 13, color: '#9ca3af', fontFamily: 'Inter, sans-serif' }}>No hay opciones</li>
-          ) : (
-            options.map(opt => (
-              <li key={opt.value} onClick={() => { onChange(String(opt.value)); setIsOpen(false); setFocused(false); }}
-                style={{ padding: '10px 16px', fontSize: 13.5, color: '#334155', cursor: 'pointer', fontFamily: 'Inter, sans-serif', background: String(value) === String(opt.value) ? '#eff6ff' : 'transparent', fontWeight: String(value) === String(opt.value) ? 600 : 400, transition: 'background 0.15s' }}
-                onMouseEnter={(e) => { if(String(value) !== String(opt.value)) e.currentTarget.style.background = '#f8fafc' }}
-                onMouseLeave={(e) => { if(String(value) !== String(opt.value)) e.currentTarget.style.background = 'transparent' }}
-              >
-                {opt.label}
-              </li>
-            ))
-          )}
+          ) : options.map(opt => (
+            <li
+              key={opt.value}
+              onClick={() => { onChange(String(opt.value)); setIsOpen(false); setFocused(false); }}
+              style={{
+                padding: '10px 16px', fontSize: 13.5, color: '#334155',
+                cursor: 'pointer', fontFamily: 'Inter, sans-serif',
+                background: String(value) === String(opt.value) ? '#eff6ff' : 'transparent',
+                fontWeight: String(value) === String(opt.value) ? 600 : 400,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={e => { if (String(value) !== String(opt.value)) e.currentTarget.style.background = '#f8fafc'; }}
+              onMouseLeave={e => { if (String(value) !== String(opt.value)) e.currentTarget.style.background = 'transparent'; }}
+            >
+              {opt.label}
+            </li>
+          ))}
         </ul>
       )}
     </div>

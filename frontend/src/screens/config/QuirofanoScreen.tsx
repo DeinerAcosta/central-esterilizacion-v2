@@ -3,30 +3,23 @@ import {
   Search, PlusCircle, ChevronDown, MoreVertical, Edit, Ban, CheckCircle, X, FileText,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight
 } from 'lucide-react';
+import Swal from 'sweetalert2';
 
 const QuirofanosScreen: React.FC = () => {
-  const [isModalOpen, setIsModalOpen]             = useState(false);
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
-  const [isCancelAlertOpen, setIsCancelAlertOpen] = useState(false);
-  const [isErrorOpen, setIsErrorOpen]             = useState(false);
-  const [isSuccessOpen, setIsSuccessOpen]         = useState(false);
-  const [errorMsg, setErrorMsg]                   = useState('');
-  const [successMsg, setSuccessMsg]               = useState('');
-  const [openMenuIndex, setOpenMenuIndex]         = useState<number | null>(null);
-  const menuRef                                   = useRef<HTMLDivElement>(null);
-  const [modalMode, setModalMode]                 = useState<'create' | 'edit' | 'view'>('create');
-  const [selectedItem, setSelectedItem]           = useState<any>(null);
-  const [loading, setLoading]                     = useState(false);
-  const [data, setData]                           = useState<any[]>([]);
-  const [sedes, setSedes]                         = useState<any[]>([]);
-  const [currentPage, setCurrentPage]             = useState(1);
-  const [totalPages, setTotalPages]               = useState(1);
-  const [totalRecords, setTotalRecords]           = useState(0);
-  const [searchTerm, setSearchTerm]               = useState('');
-  const [statusFilter, setStatusFilter]           = useState('');
-  // código generado automáticamente por el backend (alfanumérico)
-  const initialFormState = { id: null, nombre: '', sedeId: '' };
-  const [formData, setFormData]                   = useState<any>(initialFormState);
+  const [isModalOpen, setIsModalOpen]   = useState(false);
+  const [openMenuIndex, setOpenMenuIndex] = useState<number | null>(null);
+  const menuRef                         = useRef<HTMLDivElement>(null);
+  const [modalMode, setModalMode]       = useState<'create' | 'edit' | 'view'>('create');
+  const [loading, setLoading]           = useState(false);
+  const [data, setData]                 = useState<any[]>([]);
+  const [sedes, setSedes]               = useState<any[]>([]);
+  const [currentPage, setCurrentPage]   = useState(1);
+  const [totalPages, setTotalPages]     = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [searchTerm, setSearchTerm]     = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const initialFormState                = { id: null, nombre: '', sedeId: '' };
+  const [formData, setFormData]         = useState<any>(initialFormState);
 
   useEffect(() => {
     fetchListas();
@@ -71,8 +64,12 @@ const QuirofanosScreen: React.FC = () => {
 
   const handleOpenCreate = () => {
     if (sedes.length === 0) {
-      setErrorMsg('No es posible crear un quirófano porque no existen sedes registradas.');
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Sin sedes',
+        text: 'No es posible crear un quirófano porque no existen sedes registradas.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
     setFormData(initialFormState);
@@ -80,26 +77,43 @@ const QuirofanosScreen: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const handleCancelClick = () => {
-    if (modalMode === 'view') setIsModalOpen(false);
-    else setIsCancelAlertOpen(true);
+  /* ── Cierre con confirmación (X, backdrop y botón Cancelar en create/edit) ── */
+  const handleCloseModal = () => {
+    if (modalMode === 'view') { setIsModalOpen(false); return; }
+    Swal.fire({
+      title: '¿Está seguro?',
+      text: modalMode === 'create'
+        ? 'La información diligenciada no se guardará en el sistema.'
+        : 'Los cambios realizados no se guardarán en el sistema.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Aceptar',
+      cancelButtonText: 'Cancelar',
+    }).then(result => { if (result.isConfirmed) setIsModalOpen(false); });
   };
 
   const handleSave = async () => {
     if (!formData.nombre.trim() || !formData.sedeId) {
-      setErrorMsg('Es necesario el diligenciamiento de todos los campos obligatorios.');
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos incompletos',
+        text: 'Es necesario el diligenciamiento de todos los campos obligatorios.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
-    
-    // NUEVA VALIDACIÓN: Permite letras, números, espacios y caracteres básicos (.,-)
     const regexAlfanumerico = /^[a-zA-Z0-9\sáéíóúÁÉÍÓÚñÑ.\-]+$/;
     if (!regexAlfanumerico.test(formData.nombre)) {
-      setErrorMsg('El nombre del quirófano contiene caracteres inválidos.');
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'warning',
+        title: 'Formato inválido',
+        text: 'El nombre del quirófano contiene caracteres inválidos.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
-
     try {
       const method = modalMode === 'create' ? 'POST' : 'PUT';
       const url    = modalMode === 'create'
@@ -108,37 +122,68 @@ const QuirofanosScreen: React.FC = () => {
       const res = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
-        // código NO se envía — el backend lo genera automáticamente (alfanumérico)
         body: JSON.stringify({ nombre: formData.nombre, sedeId: formData.sedeId })
       });
       if (!res.ok) { const err = await res.json(); throw new Error(err.msg); }
-      setSuccessMsg(modalMode === 'create' ? 'Quirófano creado correctamente' : 'Quirófano actualizado correctamente');
-      setIsSuccessOpen(true);
+      Swal.fire({
+        icon: 'success',
+        title: '¡Éxito!',
+        text: modalMode === 'create' ? 'Quirófano creado correctamente.' : 'Quirófano actualizado correctamente.',
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        showConfirmButton: false,
+      });
       setIsModalOpen(false);
       fetchQuirofanos();
     } catch (error: any) {
-      setErrorMsg(error.message);
-      setIsErrorOpen(true);
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Ocurrió un error al guardar.',
+        confirmButtonColor: '#ef4444',
+      });
     }
   };
 
-  const confirmToggleStatus = async () => {
-    if (!selectedItem) return;
-    const nuevoEstado = selectedItem.status === 'Deshabilitado';
-    try {
-      await fetch(`http://localhost:4000/api/quirofanos/${selectedItem.id}/estado`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ estado: nuevoEstado })
-      });
-      setSuccessMsg(nuevoEstado ? 'Quirófano habilitado correctamente' : 'Quirófano deshabilitado correctamente');
-      setIsSuccessOpen(true);
-      setIsStatusModalOpen(false);
-      fetchQuirofanos();
-    } catch {
-      setErrorMsg('No se pudo cambiar el estado.');
-      setIsErrorOpen(true);
-    }
+  const handleToggleStatus = (item: any) => {
+    setOpenMenuIndex(null);
+    const accion = item.status === 'Habilitado' ? 'deshabilitará' : 'habilitará';
+    Swal.fire({
+      title: '¿Está seguro?',
+      html: `Se <b>${accion}</b> el quirófano:<br/><span style="color:#475569;font-weight:600">${item.nombre}</span>`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'Cancelar',
+    }).then(async result => {
+      if (result.isConfirmed) {
+        try {
+          const nuevoEstado = item.status === 'Deshabilitado';
+          await fetch(`http://localhost:4000/api/quirofanos/${item.id}/estado`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ estado: nuevoEstado })
+          });
+          Swal.fire({
+            icon: 'success',
+            title: 'Estado actualizado',
+            text: `El quirófano ha sido ${nuevoEstado ? 'habilitado' : 'deshabilitado'}.`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
+          fetchQuirofanos();
+        } catch {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cambiar el estado del quirófano.',
+            confirmButtonColor: '#ef4444',
+          });
+        }
+      }
+    });
   };
 
   return (
@@ -176,7 +221,6 @@ const QuirofanosScreen: React.FC = () => {
         <div className="flex flex-col md:flex-row gap-3 justify-between items-center bg-white p-3 rounded-xl shadow-sm border border-slate-100">
           <div className="flex gap-3 flex-1 w-full md:w-auto items-center">
 
-            {/* Filtro Estado — notch compacto */}
             <div style={{ width: 170, flexShrink: 0 }}>
               <QFNotchSelect
                 id="statusFilter" label="Estado"
@@ -190,7 +234,6 @@ const QuirofanosScreen: React.FC = () => {
               />
             </div>
 
-            {/* Búsqueda */}
             <div style={{ position: 'relative', flex: 1, maxWidth: 560 }}>
               <input
                 type="text"
@@ -225,9 +268,7 @@ const QuirofanosScreen: React.FC = () => {
             <table className="w-full text-sm text-left">
               <thead className="bg-slate-50/50 text-slate-700 font-bold border-b border-slate-200">
                 <tr>
-                  {/* Código — columna nueva según documento */}
                   <th className="px-6 py-4">Código</th>
-                  {/* Orden intercambiado: Nombre primero, Sede después */}
                   <th className="px-6 py-4">Nombre Quirófano</th>
                   <th className="px-6 py-4">Sede</th>
                   <th className="px-6 py-4 text-center">Estado</th>
@@ -273,7 +314,7 @@ const QuirofanosScreen: React.FC = () => {
                             <FileText size={14}/> Ver detalle
                           </button>
                           <button
-                            onClick={() => { setSelectedItem(row); setIsStatusModalOpen(true); setOpenMenuIndex(null); }}
+                            onClick={() => handleToggleStatus(row)}
                             className={`flex items-center gap-2 w-full px-4 py-2.5 text-xs hover:bg-slate-50 font-bold text-left ${
                               row.status === 'Habilitado' ? 'text-red-500' : 'text-emerald-500'
                             }`}
@@ -290,14 +331,13 @@ const QuirofanosScreen: React.FC = () => {
             </table>
           </div>
 
-          {/* Paginación completa */}
           <div className="p-4 flex justify-between items-center text-xs text-slate-400 border-t border-slate-50 font-medium">
             <span>Mostrando {data.length} de {totalRecords} registros</span>
             <div className="flex items-center gap-3 text-blue-500">
               <button onClick={() => setCurrentPage(1)} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronsLeft size={16}/></button>
-              <button onClick={() => setCurrentPage(p => Math.max(1, p-1))} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronLeft size={16}/></button>
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronLeft size={16}/></button>
               <span className="bg-blue-50 px-3 py-1 rounded text-blue-600 font-bold">Pág. {currentPage} de {totalPages || 1}</span>
-              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p+1))} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronRight size={16}/></button>
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronRight size={16}/></button>
               <button onClick={() => setCurrentPage(totalPages)} disabled={currentPage === totalPages || totalPages === 0} className="hover:text-blue-700 disabled:text-slate-300 disabled:cursor-not-allowed"><ChevronsRight size={16}/></button>
             </div>
           </div>
@@ -306,9 +346,10 @@ const QuirofanosScreen: React.FC = () => {
         {/* ══ MODAL CREAR / EDITAR / VER ══ */}
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+            {/* Backdrop — confirma antes de cerrar si es create/edit */}
             <div
               style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(4px)' }}
-              onClick={handleCancelClick}
+              onClick={handleCloseModal}
             />
             <div style={{
               position: 'relative', background: '#fff', width: '100%', maxWidth: 520,
@@ -317,8 +358,9 @@ const QuirofanosScreen: React.FC = () => {
               display: 'flex', flexDirection: 'column', gap: 18,
               fontFamily: "'Inter', sans-serif",
             }}>
+              {/* X — confirma antes de cerrar si es create/edit */}
               <button
-                onClick={handleCancelClick}
+                onClick={handleCloseModal}
                 style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 4 }}
               >
                 <X size={20} />
@@ -330,7 +372,6 @@ const QuirofanosScreen: React.FC = () => {
                 {modalMode === 'view'   && 'Detalle de quirófano'}
               </h2>
 
-              {/* 1️⃣ Nombre Quirófano — primero, según orden intercambiado del documento */}
               <QFNotchInput
                 id="nombre" label="Nombre Quirófano" required
                 value={formData.nombre}
@@ -338,7 +379,6 @@ const QuirofanosScreen: React.FC = () => {
                 onChange={(v) => setFormData((p: any) => ({ ...p, nombre: v }))}
               />
 
-              {/* 2️⃣ Sede */}
               <QFNotchSelect
                 id="sedeId" label="Sede" required
                 value={String(formData.sedeId || '')}
@@ -347,91 +387,13 @@ const QuirofanosScreen: React.FC = () => {
                 options={sedes.map(s => ({ value: s.id, label: s.nombre }))}
               />
 
-              {/* Botones */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 44, marginTop: 8 }}>
-                <button className="qf-cancel-btn" onClick={handleCancelClick}>
+                <button className="qf-cancel-btn" onClick={handleCloseModal}>
                   {modalMode === 'view' ? 'Cerrar' : 'Cancelar'}
                 </button>
                 {modalMode !== 'view' && (
                   <button className="qf-save-btn" onClick={handleSave}>Guardar</button>
                 )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA CANCELAR ══ */}
-        {isCancelAlertOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
-            <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-              <div className="w-16 h-16 bg-amber-100 text-amber-500 rounded-full flex items-center justify-center mx-auto mb-4 font-bold text-3xl">!</div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">¿Está seguro?</h3>
-              <p className="text-slate-500 text-sm mb-8">La información diligenciada no se guardará en el sistema.</p>
-              <div className="flex gap-3">
-                <button onClick={() => setIsCancelAlertOpen(false)} className="flex-1 py-2.5 rounded-full border border-slate-200 text-slate-600 font-bold text-sm">Cancelar</button>
-                <button onClick={() => { setIsCancelAlertOpen(false); setIsModalOpen(false); }} className="flex-1 py-2.5 rounded-full bg-blue-500 text-white font-bold text-sm">Aceptar</button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA ÉXITO ══ */}
-        {isSuccessOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsSuccessOpen(false)} />
-            <div className="relative bg-white w-full max-w-[380px] rounded-[30px] p-8 text-center shadow-2xl font-sans">
-              <div className="w-16 h-16 bg-emerald-100 text-emerald-500 rounded-full flex items-center justify-center mx-auto mb-4"><CheckCircle size={32}/></div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Éxito</h3>
-              <p className="text-slate-500 text-sm mb-8">{successMsg}</p>
-              <button onClick={() => setIsSuccessOpen(false)} className="w-full py-2.5 rounded-full bg-emerald-500 text-white font-bold text-sm">Aceptar</button>
-            </div>
-          </div>
-        )}
-
-        {/* ══ ALERTA ERROR ══ */}
-        {isErrorOpen && (
-          <div className="fixed inset-0 z-[110] flex items-center justify-center font-sans">
-            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setIsErrorOpen(false)} />
-            <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 text-center shadow-2xl">
-              <div className="w-16 h-16 bg-red-100 text-red-500 rounded-full flex items-center justify-center mx-auto mb-4"><X size={32}/></div>
-              <h3 className="text-xl font-bold text-slate-800 mb-2">Error / Aviso</h3>
-              <p className="text-slate-500 text-sm mb-8">{errorMsg}</p>
-              <button onClick={() => setIsErrorOpen(false)} className="w-full py-2.5 rounded-full bg-red-500 text-white font-bold text-sm">Aceptar</button>
-            </div>
-          </div>
-        )}
-
-        {/* ══ MODAL ESTADO ══ */}
-        {isStatusModalOpen && selectedItem && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center px-4 font-sans">
-            <div className="absolute inset-0 bg-black/40 backdrop-blur-[2px]" onClick={() => setIsStatusModalOpen(false)} />
-            <div className="relative bg-white w-full max-w-[400px] rounded-[30px] p-8 shadow-2xl flex flex-col items-center text-center">
-              <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-6 shadow-sm ${
-                selectedItem.status === 'Habilitado' ? 'bg-red-50 text-red-500' : 'bg-emerald-50 text-emerald-500'
-              }`}>
-                {selectedItem.status === 'Habilitado'
-                  ? <Ban size={40} strokeWidth={1.5} />
-                  : <CheckCircle size={40} strokeWidth={1.5} />
-                }
-              </div>
-              <h2 className="text-2xl font-extrabold text-slate-800 mb-2">
-                {selectedItem.status === 'Habilitado' ? 'Deshabilitar' : 'Habilitar'}
-              </h2>
-              <p className="text-slate-500 text-sm mb-8 leading-relaxed px-4 font-medium">
-                ¿Estás seguro de que deseas {selectedItem.status === 'Habilitado' ? 'deshabilitar' : 'habilitar'} el quirófano{' '}
-                <span className="font-bold text-slate-700">{selectedItem.nombre}</span>?
-              </p>
-              <div className="flex gap-3 w-full">
-                <button onClick={() => setIsStatusModalOpen(false)} className="flex-1 py-3 rounded-full border border-slate-200 text-slate-600 font-bold hover:bg-slate-50 text-sm">Cancelar</button>
-                <button
-                  onClick={confirmToggleStatus}
-                  className={`flex-1 py-3 rounded-full text-white font-bold shadow-lg text-sm bg-gradient-to-r ${
-                    selectedItem.status === 'Habilitado' ? 'from-red-500 to-rose-400' : 'from-blue-500 to-emerald-400'
-                  }`}
-                >
-                  Confirmar
-                </button>
               </div>
             </div>
           </div>
@@ -442,7 +404,7 @@ const QuirofanosScreen: React.FC = () => {
 };
 
 /* ══════════════════════════════════════════════
-   QFNotchInput — label flotante (sube/baja)
+   QFNotchInput
    ══════════════════════════════════════════════ */
 interface QFNotchInputProps {
   id: string; label: string; value: string;
@@ -491,7 +453,7 @@ const QFNotchInput: React.FC<QFNotchInputProps> = ({
 };
 
 /* ══════════════════════════════════════════════
-   QFNotchSelect — Select Nativo (Para Estado)
+   QFNotchSelect
    ══════════════════════════════════════════════ */
 interface QFNotchSelectProps {
   id: string; label: string; value: string;

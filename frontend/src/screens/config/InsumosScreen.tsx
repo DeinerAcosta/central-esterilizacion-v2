@@ -43,14 +43,11 @@ const InsumosScreen: React.FC = () => {
       const json = await res.json();
       setUnidades(json.unidades || []);
       setPresentaciones(json.presentaciones || []);
-      
-      // Filtramos para que solo guarde en el estado los proveedores que sean de compras.
-      // (Buscamos coincidencias comunes en campos de tipo de proveedor)
       const proveedoresCompras = (json.proveedores || []).filter((p: any) => 
-        p.tipo === 'Compras' || p.tipoProveedor === 'Compras' || p.categoria === 'Compras' || p.tipo_proveedor === 'Compras'
+        p.tipo === 'Compras' || p.tipoProveedor === 'Compras' ||
+        p.categoria === 'Compras' || p.tipo_proveedor === 'Compras'
       );
       setProveedores(proveedoresCompras);
-      
     } catch (error) { console.error('Error al cargar listas:', error); }
   };
 
@@ -79,12 +76,22 @@ const InsumosScreen: React.FC = () => {
 
   const handleSave = async () => {
     if (!formData.nombre.trim() || !formData.descripcion?.trim() || !formData.unidadMedidaId || !formData.presentacionId) {
-      Swal.fire({ icon: 'warning', title: 'Campos incompletos', text: 'Es necesario diligenciar todos los campos obligatorios.', confirmButtonColor: '#3b82f6' });
+      Swal.fire({
+        icon: 'warning',
+        title: 'Campos incompletos',
+        text: 'Es necesario diligenciar todos los campos obligatorios.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
     const regex = /^[\w\s.,;:¡!¿?()'"\-áéíóúÁÉÍÓÚñÑ]+$/;
     if (!regex.test(formData.nombre) || !regex.test(formData.descripcion)) {
-      Swal.fire({ icon: 'warning', title: 'Formato inválido', text: 'El nombre y la descripción contienen caracteres no permitidos.', confirmButtonColor: '#3b82f6' });
+      Swal.fire({
+        icon: 'warning',
+        title: 'Formato inválido',
+        text: 'El nombre y la descripción contienen caracteres no permitidos.',
+        confirmButtonColor: '#3b82f6',
+      });
       return;
     }
     try {
@@ -108,12 +115,46 @@ const InsumosScreen: React.FC = () => {
         });
       }
       if (!res.ok) { const err = await res.json(); throw new Error(err.msg); }
-      Swal.fire({ icon: 'success', title: '¡Éxito!', text: `Insumo ${modalMode === 'create' ? 'creado' : 'actualizado'} correctamente.`, confirmButtonColor: '#10b981', timer: 2000, showConfirmButton: false });
+      Swal.fire({
+        icon: 'success',
+        title: '¡Éxito!',
+        text: `Insumo ${modalMode === 'create' ? 'creado' : 'actualizado'} correctamente.`,
+        confirmButtonColor: '#10b981',
+        timer: 2000,
+        showConfirmButton: false,
+      });
       setIsModalOpen(false);
       fetchInsumos();
     } catch (error: any) {
-      Swal.fire({ icon: 'error', title: 'Error', text: error.message || 'Ocurrió un error al guardar.', confirmButtonColor: '#ef4444' });
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: error.message || 'Ocurrió un error al guardar.',
+        confirmButtonColor: '#ef4444',
+      });
     }
+  };
+
+  /* ── Cierre con confirmación (X, backdrop y botón Cancelar en create/edit) ── */
+  const handleCloseModal = () => {
+    if (modalMode === 'view') {
+      setIsModalOpen(false);
+      return;
+    }
+    Swal.fire({
+      title: '¿Está seguro?',
+      text: modalMode === 'create'
+        ? 'La información diligenciada no se guardará en el sistema.'
+        : 'Los cambios realizados no se guardarán en el sistema.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Aceptar',
+      cancelButtonText: 'Cancelar',
+    }).then(result => {
+      if (result.isConfirmed) setIsModalOpen(false);
+    });
   };
 
   const handleToggleClick = (item: any) => {
@@ -122,9 +163,12 @@ const InsumosScreen: React.FC = () => {
     Swal.fire({
       title: '¿Está seguro?',
       html: `Se <b>${accion}</b> el insumo:<br/><span style="color:#475569;font-weight:600">${item.nombre}</span>`,
-      icon: 'warning', showCancelButton: true,
-      confirmButtonColor: '#3b82f6', cancelButtonColor: '#94a3b8',
-      confirmButtonText: 'Sí, continuar', cancelButtonText: 'Cancelar'
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#3b82f6',
+      cancelButtonColor: '#94a3b8',
+      confirmButtonText: 'Sí, continuar',
+      cancelButtonText: 'Cancelar',
     }).then(async (result) => {
       if (result.isConfirmed) {
         try {
@@ -132,9 +176,22 @@ const InsumosScreen: React.FC = () => {
             method: 'PATCH', headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ estado: item.status !== 'Habilitado' })
           });
-          Swal.fire({ icon: 'success', title: 'Estado actualizado', text: `El insumo ha sido ${item.status === 'Habilitado' ? 'deshabilitado' : 'habilitado'}.`, timer: 1500, showConfirmButton: false });
+          Swal.fire({
+            icon: 'success',
+            title: 'Estado actualizado',
+            text: `El insumo ha sido ${item.status === 'Habilitado' ? 'deshabilitado' : 'habilitado'}.`,
+            timer: 1500,
+            showConfirmButton: false,
+          });
           fetchInsumos();
-        } catch { Swal.fire('Error', 'No se pudo cambiar el estado del insumo.', 'error'); }
+        } catch {
+          Swal.fire({
+            icon: 'error',
+            title: 'Error',
+            text: 'No se pudo cambiar el estado del insumo.',
+            confirmButtonColor: '#ef4444',
+          });
+        }
       }
     });
   };
@@ -170,7 +227,6 @@ const InsumosScreen: React.FC = () => {
 
         .m-notch-wrapper { position: relative; }
 
-        /* ── Input texto ── */
         .m-notch-input {
           width: 100%; height: 48px; border-radius: 30px;
           border: 1.5px solid #d1d5db; background: #fff;
@@ -181,7 +237,6 @@ const InsumosScreen: React.FC = () => {
         .m-notch-input:disabled { background: #f8fafc; cursor: not-allowed; color: #94a3b8; }
         .m-notch-input:focus:not(:disabled) { border-color: #3b82f6; }
 
-        /* ── Select ── */
         .m-notch-select {
           width: 100%; height: 48px; border-radius: 30px;
           border: 1.5px solid #d1d5db; background: #fff;
@@ -193,14 +248,12 @@ const InsumosScreen: React.FC = () => {
         .m-notch-select:disabled { background: #f8fafc; cursor: not-allowed; color: #94a3b8; }
         .m-notch-select:focus:not(:disabled) { border-color: #3b82f6; }
 
-        /* Select compacto barra */
         .m-notch-select.bar {
           height: 42px; background: #f8fafc; font-size: 13px;
           padding: 12px 36px 0 16px;
         }
         .m-notch-select.bar:focus { border-color: #3b82f6; background: #fff; }
 
-        /* ── Label: SIEMPRE arriba (posición fija en el borde superior) ── */
         .m-notch-label {
           position: absolute; left: 18px; top: 0;
           transform: translateY(-50%);
@@ -213,26 +266,21 @@ const InsumosScreen: React.FC = () => {
         }
         .m-notch-label .ast { color: #ef4444; margin-left: 1px; }
 
-        /* Label color azul en focus */
         .m-notch-wrapper.focused .m-notch-label  { color: #3b82f6; }
         .m-notch-wrapper.focused .m-notch-input  { border-color: #3b82f6; }
         .m-notch-wrapper.focused .m-notch-select { border-color: #3b82f6; }
 
-        /* Label fondo gris para barra y para disabled */
         .m-notch-wrapper.bar-wrap  .m-notch-label { background: #f8fafc; }
         .m-notch-wrapper.bar-wrap.focused .m-notch-label { background: #fff; }
         .m-notch-wrapper.disabled  .m-notch-label { background: #f8fafc; }
 
-        /* Placeholder dentro del select: texto gris pequeño */
         .m-notch-select option[value=""] { color: #9ca3af; }
 
-        /* Chevron */
         .m-right-icon {
           position: absolute; right: 14px; top: 50%;
           transform: translateY(-50%); pointer-events: none; color: #9ca3af;
         }
 
-        /* Botones */
         .m-save-btn {
           padding: 11px 48px; border-radius: 30px; border: none; cursor: pointer;
           background: linear-gradient(90deg, #60a5fa 0%, #34d399 100%);
@@ -250,7 +298,6 @@ const InsumosScreen: React.FC = () => {
         }
         .m-cancel-btn:hover { color: #ef4444; }
 
-        /* Icono lupa barra */
         .bar-search-icon {
           position: absolute; right: 14px; top: 50%;
           transform: translateY(-50%); pointer-events: none; color: #60a5fa;
@@ -272,7 +319,7 @@ const InsumosScreen: React.FC = () => {
                 value={statusFilter}
                 onChange={(v) => { setStatusFilter(v); setCurrentPage(1); }}
                 options={[
-                  { value: 'true',  label: 'Habilitar'    },
+                  { value: 'true',  label: 'Habilitado'    },
                   { value: 'false', label: 'Deshabilitado' },
                 ]}
                 compact
@@ -381,8 +428,11 @@ const InsumosScreen: React.FC = () => {
         {/* ══ MODAL ══ */}
         {isModalOpen && (
           <div style={{ position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-            <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(4px)' }}
-              onClick={() => setIsModalOpen(false)} />
+            {/* Backdrop — confirma antes de cerrar si es create/edit */}
+            <div
+              style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.25)', backdropFilter: 'blur(4px)' }}
+              onClick={handleCloseModal}
+            />
 
             <div style={{
               position: 'relative', background: '#fff', width: '100%', maxWidth: 560,
@@ -391,7 +441,9 @@ const InsumosScreen: React.FC = () => {
               display: 'flex', flexDirection: 'column', gap: 16,
               fontFamily: "'Inter', sans-serif",
             }}>
-              <button onClick={() => setIsModalOpen(false)}
+              {/* X — confirma antes de cerrar si es create/edit */}
+              <button
+                onClick={handleCloseModal}
                 style={{ position: 'absolute', top: 16, right: 16, background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', display: 'flex', padding: 4 }}>
                 <X size={20} />
               </button>
@@ -480,7 +532,8 @@ const InsumosScreen: React.FC = () => {
 
               {/* Botones */}
               <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 44, marginTop: 8 }}>
-                <button className="m-cancel-btn" onClick={() => setIsModalOpen(false)}>
+                {/* Cancelar/Cerrar — confirma si hay cambios no guardados */}
+                <button className="m-cancel-btn" onClick={handleCloseModal}>
                   {isView ? 'Cerrar' : 'Cancelar'}
                 </button>
                 {!isView && (
@@ -496,8 +549,7 @@ const InsumosScreen: React.FC = () => {
 };
 
 /* ══════════════════════════════════════════════
-   ModalNotchInput — label SIEMPRE arriba
-   sube cuando hay texto, baja solo si pierde foco y está vacío
+   ModalNotchInput
    ══════════════════════════════════════════════ */
 interface ModalNotchInputProps {
   id: string; label: string; value: string;
@@ -508,7 +560,6 @@ const ModalNotchInput: React.FC<ModalNotchInputProps> = ({
   id, label, value, disabled = false, required = false, onChange
 }) => {
   const [focused, setFocused] = useState(false);
-  // Para inputs: sube con foco o cuando hay texto
   const active = focused || value.length > 0;
 
   return (
@@ -534,7 +585,7 @@ const ModalNotchInput: React.FC<ModalNotchInputProps> = ({
         position: 'absolute',
         left: 18,
         top: active ? 0 : '50%',
-        transform: active ? 'translateY(-50%)' : 'translateY(-50%)',
+        transform: 'translateY(-50%)',
         fontSize: active ? 10.5 : 13,
         color: focused ? '#3b82f6' : (active ? '#6b7280' : '#9ca3af'),
         pointerEvents: 'none',
@@ -551,9 +602,7 @@ const ModalNotchInput: React.FC<ModalNotchInputProps> = ({
 };
 
 /* ══════════════════════════════════════════════
-   ModalNotchSelect — label SIEMPRE arriba (fijo en borde)
-   "Seleccionar" aparece como primera opción elegible
-   cuando se escoge → label sigue arriba + valor visible
+   ModalNotchSelect
    ══════════════════════════════════════════════ */
 interface ModalNotchSelectProps {
   id: string; label: string; value: string;
@@ -566,9 +615,6 @@ const ModalNotchSelect: React.FC<ModalNotchSelectProps> = ({
   compact = false, onChange, options
 }) => {
   const [focused, setFocused] = useState(false);
-
-  // Para selects: label SIEMPRE en la parte superior del borde
-  // (porque el select siempre muestra un texto — sea "Seleccionar" o el valor elegido)
   const bgColor = disabled ? '#f8fafc' : (compact ? (focused ? '#fff' : '#f8fafc') : '#fff');
 
   return (
@@ -597,14 +643,12 @@ const ModalNotchSelect: React.FC<ModalNotchSelectProps> = ({
           cursor: disabled ? 'not-allowed' : 'pointer',
         }}
       >
-        {/* Primera opción: "Seleccionar" siempre visible pero en gris */}
         <option value="" style={{ color: '#9ca3af' }}>Seleccionar</option>
         {options.map(opt => (
           <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
 
-      {/* Label SIEMPRE fijo en el borde superior */}
       <label htmlFor={id} style={{
         position: 'absolute',
         left: 18, top: 0,
